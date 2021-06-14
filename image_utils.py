@@ -22,7 +22,6 @@ def sliding_window(image, window_size, scale, stride):
 def detections_gt(bboxes, iou_threshold=0.5):
 	ground_thruth = []
 	ratio = []
-
 	for bbox in bboxes:
 		ratio.append(bb_intersection_over_union(bbox, [82, 91, 84, 84]));
 	ratio = np.asarray(ratio)
