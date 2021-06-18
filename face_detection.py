@@ -11,6 +11,11 @@ from evaluation import evaluate_detector, precision_and_recall, interpolated_ave
 import sys
 from image_utils import non_max_suppression
 
+from skimage.io import imread
+from skimage.transform import resize
+from skimage.feature import hog
+from skimage import exposure
+
 
 class FeatureExtractors(Enum):
 	MiniImage = 1
@@ -116,7 +121,42 @@ def show_image_with_bbox(image, bboxes, draw_GT=True):
 	plt.show()
 
 
+def get_patches(gray_image, window_size, classifier):
+
+	patches, bbox_locations = sliding_window(gray_image, window_size, 1, 32)
+
+	# You need to extract features for every patch (same features you used for training the classifier)
+	patches_feature_representation = []
+
+	for i in range(patches.shape[2]):
+		patch_representation = extract_features(FeatureExtractors.MiniImage, patches[:, :, i])
+		patches_feature_representation.append(patch_representation)
+
+	patches_feature_representation = np.asarray(patches_feature_representation)
+
+	# Get score for each sliding window patch
+	scores = classifier.predict_proba(patches_feature_representation)
+
+	return patches_feature_representation, patches, bbox_locations, scores
+
+
+def print_images(precision, recall):
+	plt.plot(recall, precision)
+	plt.xlabel('Recall')
+	plt.ylabel('Precision')
+	plt.xlim(0, 1.1)
+	plt.ylim(0, 1.1)
+
+	ap = interpolated_average_precision(recall, precision)
+	print('Detection Average Precision is {}'.format(ap))
+
+	cv2.waitKey(0)  # wait for any key
+	cv2.destroyAllWindows()
+
+
 def main():
+	feature_method = FeatureExtractors.MiniImage
+
 	data_dir = './data'
 	face_detection_dir = os.path.join(data_dir, 'face_detection')
 	training_faces_dir = os.path.join(face_detection_dir, 'cropped_faces')
@@ -129,8 +169,6 @@ def main():
 													   FeatureExtractors.MiniImage)
 	# You can save traninig_data and labels on nunmpy files to avoid processing data every time.
 
-	validation_data = load_validation_data(validation_faces_dir)
-
 	knn_classifier = sklearn.neighbors.KNeighborsClassifier(n_neighbors=3)
 	knn_classifier.fit(training_data, trainig_labels)
 
@@ -142,25 +180,23 @@ def main():
 	predictions = []
 	threshold_p = 0.5
 	overlap_threshold = 0.5
-	validation_data = load_validation_data(validation_faces_dir)
-	for img in validation_data:
-		gray_image = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-		patches, bbox_locations = sliding_window(gray_image, window_size, 1, 32)
 
-		# You need to extract features for every patch (same features you used for training the classifier)
-		patches_feature_representation = []
-		for i in range(patches.shape[2]):
-			patch_representation = extract_features(FeatureExtractors.MiniImage, patches[:, :, i])
-			patches_feature_representation.append(patch_representation)
-		patches_feature_representation = np.asarray(patches_feature_representation)
+	validation_data = load_validation_data(validation_faces_dir)
+
+	for img in validation_data:
+
+		gray_image = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+
+		patches_feature_representation, patches, bbox_locations, scores = get_patches(gray_image, window_size, classifier)
+
 		# Get prediction label for each sliding window patch
 		labels = classifier.predict(patches_feature_representation)
-		# Get score for each sliding window patch
-		scores = classifier.predict_proba(patches_feature_representation)
+
 		# Positive Face Probabilities
 		face_probabilities = scores[:, 1]
 		face_bboxes = bbox_locations[face_probabilities > threshold_p]
 		face_bboxes_probabilites = face_probabilities[face_probabilities > threshold_p]
+
 		# Do non max suppression and select strongest probability box
 		[selected_bbox, selected_score] = non_max_suppression(face_bboxes, face_bboxes_probabilites, 0.3)
 		show_image_with_bbox(img, selected_bbox)
@@ -171,18 +207,14 @@ def main():
 	window_size = [64, 64]
 	for subject_folder in sorted(glob(validation_raw_faces_dir + '/*')):
 		for img in sorted(glob(subject_folder + '/*.jpg')):
+
 			gray_image = cv2.imread(img, cv2.IMREAD_GRAYSCALE)
-			patches, bbox_locations = sliding_window(gray_image, window_size, 1, 32)
-			# You need to extract features for every patch (same features you used for training the classifier)
-			patches_feature_representation = []
-			for i in range(patches.shape[2]):
-				patch_representation = extract_features(FeatureExtractors.MiniImage, patches[:, :, i])
-				patches_feature_representation.append(patch_representation)
-			patches_feature_representation = np.asarray(patches_feature_representation)
-			# Get score for each sliding window patch
-			scores = classifier.predict_proba(patches_feature_representation)
+
+			patches_feature_representation, patches, bbox_locations, scores = get_patches(gray_image, window_size, classifier)
+
 			# Positive Face Probabilities
 			face_probabilities = scores[:, 1]
+
 			# [labels, acc, prob] = predict([],patches_feature_representation, clasifier)
 			# Positive Face Probabilities
 			# face_probabilities = np.asarray(prob)
@@ -200,14 +232,7 @@ def main():
 
 	precision, recall = precision_and_recall(total_true_positives, total_real_positives, total_positive_predictions)
 
-	plt.plot(recall, precision)
-	plt.xlabel('Recall')
-	plt.ylabel('Precision')
-	plt.xlim(0, 1.1)
-	plt.ylim(0, 1.1)
-
-	ap = interpolated_average_precision(recall, precision)
-	print('Detection Average Precision is {}'.format(ap))
+	print_images(precision, recall)
 
 
 if __name__ == '__main__':

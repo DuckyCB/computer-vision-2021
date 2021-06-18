@@ -75,18 +75,6 @@ def hough_to_lines(img, points_hough, theta_num=4):
 						if radiusn == pn:
 							vertices.append([column, row])
 	return vertices
-	# x, y, z = img.shape
-	# hyp = int(math.hypot(x, y))
-	# pii = np.pi / (180 * theta_num)
-	# for point in points_hough:
-	# 	t, p = point[0], point[1]
-	# 	cos_theta = np.cos(t * pii)
-	# 	sin_theta = np.sin(t * pii)
-	# 	for row in range(x):
-	# 		for column in range(y):
-	# 			radius = int(column * cos_theta + row * sin_theta) + hyp
-	# 			if radius == p:
-	# 				img[row, column] = (0, 0, 255)
 
 
 def draw_points(img, points):
@@ -95,27 +83,36 @@ def draw_points(img, points):
 	return img
 
 
-def edge_detection(img):
-	# # Vertical lines
-	# filter_edge = np.array([-1, 0, 1]).reshape(1, 3)
-	# img_edge_v = cv.filter2D(gray, -1, filter_edge)
-	# cv.imshow("vertical", img_edge_v)
-	# # Horizontal lines
-	# filter_edge_t = filter_edge.T
-	# img_edge_h = cv.filter2D(gray, -1, filter_edge_t)
-	# cv.imshow("horizontal", img_edge_h)
+def edge_detection(gray):
+	# Vertical lines
+	filter_edge = np.array([-1, 0, 1]).reshape(1, 3)
+	img_edge_v = cv.filter2D(gray, -1, filter_edge)
+	threshold(img_edge_v, 60)
+	cv.imshow("vertical", img_edge_v)
+	# Horizontal lines
+	filter_edge_t = filter_edge.T
+	img_edge_h = cv.filter2D(gray, -1, filter_edge_t)
+	threshold(img_edge_h, 60)
+	cv.imshow("horizontal", img_edge_h)
+	img_edge = img_edge_v.copy()
+	x, y = img_edge_v.shape
+	for row in range(x):
+		for column in range(y):
+			if img_edge_h[row, column] > 128:
+				img_edge[row, column] = 255
+	cv.imshow("edges", img_edge)
 	# intensitity_image = np.sqrt(np.power(img_edge_h, 2) + np.power(img_edge_v, 2))
-	pass
+	return img_edge
 
 
 def main():
 	original = cv.imread('images/football.png')
 	gray = cv.cvtColor(original, cv.COLOR_BGR2GRAY)
 	# Para imagenes en colores es necesario usar el detector de bordes
-	# edges = edge_detection(gray)
-	threshold(gray, 128)
+	edges = edge_detection(gray)
+	# threshold(edges, 128)
 
-	accumulator = hough_transform(gray)
+	accumulator = hough_transform(edges)
 	cv.imshow("Accumulator (Hough space)", accumulator)
 	# El segundo parametro es el treshold, bajandolo se pueden detectar lineas mas cortas
 	threshold(accumulator, 0.5)
@@ -125,6 +122,7 @@ def main():
 
 	accumulator = np.float32(accumulator)
 	accumulator = cv.cvtColor(accumulator, cv.COLOR_GRAY2BGR)
+	print(vertices)
 	accumulator = draw_points(accumulator, points_hough)
 
 	cv.imshow("Lines", original)

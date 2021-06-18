@@ -4,17 +4,17 @@ import matplotlib.pyplot as plt
 
 
 def sliding_window(image, window_size, scale, stride):
-	[image_rows, image_cols] = image.shape;
-	window_rows = window_size[0];
-	window_cols = window_size[1];
+	[image_rows, image_cols] = image.shape
+	window_rows = window_size[0]
+	window_cols = window_size[1]
 
-	patches = np.zeros((window_rows, window_cols, 5));
+	patches = np.zeros((window_rows, window_cols, 5))
 	bbox_locations = np.zeros((5, 4))
-	r = np.random.randint(0, image_rows - window_rows, 5);  # Sample top left position
-	c = np.random.randint(0, image_cols - window_cols, 5);
+	r = np.random.randint(0, image_rows - window_rows, 5)  # Sample top left position
+	c = np.random.randint(0, image_cols - window_cols, 5)
 	for i in range(0, 5):
-		patches[:, :, i] = image[r[i]:r[i] + window_rows, c[i]:c[i] + window_cols];
-		bbox_locations[i, :] = [r[i], c[i], window_rows, window_cols];  # top-left y,x, height, width
+		patches[:, :, i] = image[r[i]:r[i] + window_rows, c[i]:c[i] + window_cols]
+		bbox_locations[i, :] = [r[i], c[i], window_rows, window_cols]  # top-left y,x, height, width
 
 	return patches, bbox_locations
 
@@ -33,16 +33,12 @@ def show_image_with_bbox(image, bboxes, draw_GT=True):
 	GT = [82, 91, 166, 175]
 	if draw_GT:
 		cv2.rectangle(image, (GT[0], GT[1]), (GT[2], GT[3]), (0, 0, 255), 2)
-
 	for bbox in bboxes:
 		if len(bbox) == 4:
 			top_left = (int(bbox[0]), int(bbox[1]))
 			bottom_right = (int(bbox[0]) + int(bbox[2]), int(bbox[1]) + int(bbox[3]))
 			cv2.rectangle(image, top_left, bottom_right, (255, 0, 0), 2)
-
 	cv2.imshow('image', image)
-	cv2.waitKey(0)  # wait for any key
-	cv2.destroyAllWindows()
 
 
 # Malisiewicz et al. From pyimagesearch modifid with boxes_probabilities to return only one bbox
