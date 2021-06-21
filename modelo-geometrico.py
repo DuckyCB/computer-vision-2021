@@ -33,6 +33,7 @@ def hough_transform(img, theta_num=4, acc=0.005):
 
 
 # Toma los puntos de acumulación del espacio de hough
+# Toma figuras (manchas) de la imagen y toma el centro de cada una
 def hough_points(img):
 	img = np.uint8(img)
 	contours = cv.findContours(img, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
@@ -66,6 +67,7 @@ def hough_to_lines(img, points_hough, theta_num=4):
 				radius = int(column * cos_theta + row * sin_theta) + hyp
 				if radius == p:
 					img[row, column] = (255, 0, 0)
+					# Para cada punto de hough, prueba todos los demás puntos que tengan rectas que se toquen.
 					for nn in range(len_ph - n - 1):
 						pointn = points_hough[len_ph - nn - 1]
 						tn, pn = pointn[0], pointn[1]
@@ -77,12 +79,14 @@ def hough_to_lines(img, points_hough, theta_num=4):
 	return vertices
 
 
+# Dibuja puntos rojos en la imagen
 def draw_points(img, points):
 	for point in points:
 		cv.circle(img, point, 3, (0, 0, 255), -1)
 	return img
 
 
+#
 def edge_detection(gray):
 	# Vertical lines
 	filter_edge = np.array([-1, 0, 1]).reshape(1, 3)
@@ -96,22 +100,22 @@ def edge_detection(gray):
 	cv.imshow("horizontal", img_edge_h)
 	img_edge = img_edge_v.copy()
 	x, y = img_edge_v.shape
+	# Crea una imagen sumando todos los puntos de borde verticales y horizontales
 	for row in range(x):
 		for column in range(y):
 			if img_edge_h[row, column] > 128:
 				img_edge[row, column] = 255
 	cv.imshow("edges", img_edge)
-	# intensitity_image = np.sqrt(np.power(img_edge_h, 2) + np.power(img_edge_v, 2))
 	return img_edge
 
 
 def main():
+	# Abre una imagen y detecta los bordes
 	original = cv.imread('images/football.png')
 	gray = cv.cvtColor(original, cv.COLOR_BGR2GRAY)
-	# Para imagenes en colores es necesario usar el detector de bordes
 	edges = edge_detection(gray)
-	# threshold(edges, 128)
 
+	# Realiza la transformada de hough y toma los puntos con mayor acumulacion de curvas
 	accumulator = hough_transform(edges)
 	cv.imshow("Accumulator (Hough space)", accumulator)
 	# El segundo parametro es el treshold, bajandolo se pueden detectar lineas mas cortas
@@ -119,12 +123,15 @@ def main():
 	points_hough = hough_points(accumulator)
 	vertices = hough_to_lines(original, points_hough, 4)
 	original = draw_points(original, vertices)
+	# Puntos donde se intersectan las rectas
+	print(vertices)
 
+	# Convierte el accumulator en una imagen a color para mostrar los puntos tomados
 	accumulator = np.float32(accumulator)
 	accumulator = cv.cvtColor(accumulator, cv.COLOR_GRAY2BGR)
-	print(vertices)
 	accumulator = draw_points(accumulator, points_hough)
 
+	# Muestra la imagen final con las rectas y los puntos detectados
 	cv.imshow("Lines", original)
 	cv.imshow("Accumulation points (hough space)", accumulator)
 
