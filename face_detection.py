@@ -1,23 +1,21 @@
 import os
 import pickle
+import time
 from enum import Enum
 from glob import glob
 
 import cv2 as cv
 import matplotlib.pyplot as plt
 import numpy as np
+import progressbar
 import sklearn.neighbors
-from numba import jit
-from skimage import exposure
 from skimage.feature import hog
 from skimage.feature import local_binary_pattern
 from sklearn import svm
 
 from evaluation import evaluate_detector, precision_and_recall, interpolated_average_precision
-from image_utils import non_max_suppression
 
-import time
-import progressbar
+import image_utils
 
 
 class FeatureExtractors(Enum):
@@ -28,7 +26,6 @@ class FeatureExtractors(Enum):
 
 def extract_features(method, img):
 	# Switch between Feature extraction Methods
-
 	image_representation = []
 
 	if method == FeatureExtractors.MiniImage:
@@ -56,15 +53,13 @@ def extract_lbp_features(img):
 	return to_return
 
 
-# @jit(nopython=True)
 def extract_hog_features(img):
 	fd, _ = hog(img, orientations=10, pixels_per_cell=(8, 8), cells_per_block=(2, 2), visualize=True)
 	return fd
 
 
+# Function for loading loading training data from positive and negative examples
 def load_training_data(training_positive_dir, trainign_negative_dir, feature_extractor=FeatureExtractors.MiniImage):
-	# Function for loading loading training data from positive and negative examples
-
 	positive_img_files = sorted(glob(training_positive_dir + '/*'))
 	negative_img_files = sorted(glob(trainign_negative_dir + '/*'))
 	# comment these lines for loading all data:
@@ -73,40 +68,40 @@ def load_training_data(training_positive_dir, trainign_negative_dir, feature_ext
 	# positive_img_files = positive_img_files[:100]
 	# negative_img_files = negative_img_files[:200]
 
-	training_data = []
-	training_labels = []
+	training_dat = []
+	training_label = []
 
 	print('\n Loading positive face images')
-	bar_prog = 0
+	bar_progres = 0
 	bar_positive = progressbar.ProgressBar(max_value=len(positive_img_files))
-	bar_positive.update(bar_prog)
+	bar_positive.update(bar_progres)
 
 	for img in positive_img_files:
 		gray = cv.imread(img, cv.IMREAD_GRAYSCALE)
 		image_representation = extract_features(feature_extractor, gray)
-		training_data.append(image_representation)
-		training_labels.append(1)
+		training_dat.append(image_representation)
+		training_label.append(1)
 
-		bar_prog += 1
-		bar_positive.update(bar_prog)
+		bar_progres += 1
+		bar_positive.update(bar_progres)
 
 	print('\n Loading negative face images')
-	bar_prog = 0
+	bar_progres = 0
 	bar_negative = progressbar.ProgressBar(max_value=len(negative_img_files))
-	bar_negative.update(bar_prog)
+	bar_negative.update(bar_progres)
 
 	for img in negative_img_files:
 		gray = cv.imread(img, cv.IMREAD_GRAYSCALE)
 		image_representation = extract_features(feature_extractor, gray)
-		training_data.append(image_representation)
-		training_labels.append(0)
+		training_dat.append(image_representation)
+		training_label.append(0)
 
-		bar_prog += 1
-		bar_negative.update(bar_prog)
+		bar_progres += 1
+		bar_negative.update(bar_progres)
 
-	training_data = np.asarray(training_data)
-	training_labels = np.asarray(training_labels)
-	return training_data, training_labels
+	training_dat = np.asarray(training_dat)
+	training_label = np.asarray(training_label)
+	return training_dat, training_label
 
 
 def load_validation_data(validation_data_dir):
@@ -136,7 +131,6 @@ def sliding_window(img, window_siz, scale, stride):
 
 
 def sliding_window_full(img, window_siz, scale, stride):
-	[image_rows, image_cols] = img.shape
 	window_rows = window_siz[0]
 	window_cols = window_siz[1]
 
@@ -151,11 +145,7 @@ def sliding_window_full(img, window_siz, scale, stride):
 		for j in range(0, len(c)):
 			pats[:, :, t] = img[r[i]:r[i] + window_rows, c[j]:c[j] + window_cols]
 			bbox_locs[t, :] = [r[i], c[j], window_rows, window_cols]  # top-left y,x, height, width
-			t = t + 1
-		# print(t)
-	# print(t)
-
-	# 34410
+			t += 1
 
 	return pats, bbox_locs
 
@@ -174,30 +164,14 @@ def get_patches(gray_img, w_size, classif):
 	return patches_feature_rep, pats, bbox_locs, score
 
 
-def show_image_with_bbox(img, bboxes, draw_GT=True):
-	GT = [82, 91, 166, 175]
-	if draw_GT:
-		cv.rectangle(img, (GT[0], GT[1]), (GT[2], GT[3]), (0, 0, 255), 2)
-
-	for bbox in bboxes:
-		if len(bbox) == 4:
-			top_left = (int(bbox[0]), int(bbox[1]))
-			bottom_right = (int(bbox[0]) + int(bbox[2]), int(bbox[1]) + int(bbox[3]))
-			cv.rectangle(img, top_left, bottom_right, (255, 0, 0), 2)
-
-	plt.imshow(img[..., ::-1])
-	plt.axis('off')
-	plt.show()
-
-
 if __name__ == '__main__':
-	start_time = time.time()
+
 	input_image = 'data/face_detection/val_face_detection_images/seen_Eric_Bana_0001.jpg'
 	gray_eric = cv.imread(input_image, cv.IMREAD_GRAYSCALE)
 	window_size = [64, 64]
 	# window_size = [84, 84]
 	patches, bbox_locations = sliding_window_full(gray_eric, window_size, 1, 32)
-	show_image_with_bbox(gray_eric, bbox_locations)
+	image_utils.show_image_with_bbox(gray_eric, bbox_locations)
 
 	data_dir = 'data'
 	face_detection_dir = os.path.join(data_dir, 'face_detection')
@@ -206,45 +180,21 @@ if __name__ == '__main__':
 	validation_faces_dir = os.path.join(face_detection_dir, 'val_face_detection_images')
 	validation_raw_faces_dir = os.path.join(face_detection_dir, 'val_raw_images')
 
-	# training_data, trainig_labels = load_training_data(training_faces_dir, negative_examples_training_dir,
-	# 												   FeatureExtractors.MiniImage)
-	training_data2, trainig_labels2 = load_training_data(training_faces_dir, negative_examples_training_dir,
-														 FeatureExtractors.HOG)
-	# training_data3, trainig_labels3 = load_training_data(training_faces_dir, negative_examples_training_dir,
-	# 													 FeatureExtractors.LBP)
-
-	# gray_eric = cv.imread(input_image, cv.IMREAD_GRAYSCALE)
-	#
-	# fd, hog_image = hog(gray_eric, orientations=16, pixels_per_cell=(8, 8), cells_per_block=(8, 8), visualize=True)
-	# fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4), sharex=True, sharey=True)
-	# ax1.axis('off')
-	# ax1.imshow(gray_eric, cmap=plt.cm.gray)
-	# ax1.set_title('Input image')
-	# # Rescale histogram for better display
-	# hog_image_rescaled = exposure.rescale_intensity(hog_image, in_range=(0, 10))
-	# ax2.axis('off')
-	# ax2.imshow(hog_image_rescaled, cmap=plt.cm.gray)
-	# ax2.set_title('Histogram of Oriented Gradients')
-	# plt.show()
-	#
-	# METHOD = 'uniform'
-	# radius = 3
-	# n_points = 8 * radius
-	#
-	# lbp_image = local_binary_pattern(gray_eric, n_points, radius, METHOD)
-	# plt.imshow(lbp_image)
-	#
-	# asdsad = np.concatenate(lbp_image, axis=0)
+	training_data, training_labels = \
+		load_training_data(training_faces_dir, negative_examples_training_dir, FeatureExtractors.HOG)
 
 	validation_data = load_validation_data(validation_faces_dir)
 	knn_classifier = sklearn.neighbors.KNeighborsClassifier(n_neighbors=8)
-	knn_classifier.fit(training_data2, trainig_labels2)
+	knn_classifier.fit(training_data, training_labels)
 
-	# clf = svm.SVC(C=5.0, probability=True)
-	# clf.fit(training_data2, trainig_labels2)
-	# pickle.dump(clf, open('./face_detector', 'wb'))
-
-	pickle.dump(knn_classifier, open('./face_detector', 'wb'))
+	# Usar esta variable en True para usar SVM
+	use_svm = False
+	if use_svm:
+		clf = svm.SVC(C=5.0, probability=True)
+		clf.fit(training_data, training_labels)
+		pickle.dump(clf, open('./face_detector', 'wb'))
+	else:
+		pickle.dump(knn_classifier, open('./face_detector', 'wb'))
 
 	classifier = pickle.load(open('./face_detector', 'rb'))
 
@@ -275,7 +225,7 @@ if __name__ == '__main__':
 	# 	bar_progress += 1
 	# 	bar.update(bar_progress)
 
-	# 5:34 mins
+	# Cuenta la cantidad de imagenes que hay para analizar
 	qty = 0
 	for subject_folder in sorted(glob(validation_raw_faces_dir + '/*')):
 		for imag in sorted(glob(subject_folder + '/*.jpg')):
@@ -292,17 +242,13 @@ if __name__ == '__main__':
 	for subject_folder in sorted(glob(validation_raw_faces_dir + '/*')):
 		for imag in sorted(glob(subject_folder + '/*.jpg')):
 			gray_image = cv.imread(imag, cv.IMREAD_GRAYSCALE)
-			patches_feature_representation, patches, bbox_locations, scores = get_patches(gray_image, window_size,
-																						  classifier)
+			patches_feature_representation, patches, bbox_locations, scores = \
+				get_patches(gray_image, window_size, classifier)
 			# Positive Face Probabilities
 			face_probabilities = scores[:, 1]
-			# [labels, acc, prob] = predict([],patches_feature_representation, clasifier)
-			# Positive Face Probabilities
-			# face_probabilities = np.asarray(prob)
-			# face_probabilities = face_probabilities.T[0]
 
-			[detected_true_positives, image_real_positives, detected_faces] = evaluate_detector(bbox_locations,
-																								face_probabilities)
+			[detected_true_positives, image_real_positives, detected_faces] = \
+				evaluate_detector(bbox_locations, face_probabilities)
 			total_true_positives.append(detected_true_positives)
 			total_real_positives.append(image_real_positives)
 			total_positive_predictions.append(detected_faces)
@@ -324,4 +270,4 @@ if __name__ == '__main__':
 
 	ap = interpolated_average_precision(recall, precision)
 
-	print('Detection Average Precision is {}'.format(ap))
+	print('\nDetection Average Precision is {}'.format(ap))
