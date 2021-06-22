@@ -1,6 +1,5 @@
 import os
 import pickle
-import time
 from enum import Enum
 from glob import glob
 

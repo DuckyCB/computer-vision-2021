@@ -1,9 +1,9 @@
 import math
-import imutils
+
 import cv2 as cv
+import imutils
 import numpy as np
-import matplotlib.pyplot as plt
-from image_utils import draw_lines, draw_lines_polar
+from sklearn.metrics import mean_squared_error
 
 
 # threshold
@@ -124,7 +124,8 @@ def main():
 	vertices = hough_to_lines(original, points_hough, 4)
 	original = draw_points(original, vertices)
 	# Puntos donde se intersectan las rectas
-	print(vertices)
+	vertices.sort(key=lambda a: a[0])
+	print('Puntos obtenidos: ' + str(vertices))
 
 	# Convierte el accumulator en una imagen a color para mostrar los puntos tomados
 	accumulator = np.float32(accumulator)
@@ -134,6 +135,12 @@ def main():
 	# Muestra la imagen final con las rectas y los puntos detectados
 	cv.imshow("Lines", original)
 	cv.imshow("Accumulation points (hough space)", accumulator)
+
+	vertices_real = [[10, 22], [134, 16], [257, 9], [266, 178], [141, 186], [19, 192]]
+	vertices_real.sort(key=lambda a: a[0])
+	print('Puntos reales: ' + str(vertices_real))
+	mse = mean_squared_error(vertices_real, vertices)
+	print("The Mean Square Error is: ", mse)
 
 	cv.waitKey(0)
 	cv.destroyAllWindows()
