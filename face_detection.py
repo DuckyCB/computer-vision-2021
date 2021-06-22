@@ -113,22 +113,6 @@ def load_validation_data(validation_data_dir):
 	return val_images
 
 
-def sliding_window(img, window_siz, scale, stride):
-	[img_rows, img_cols] = img.shape
-	window_rows = window_siz[0]
-	window_cols = window_siz[1]
-
-	pats = np.zeros((window_rows, window_cols, 5))
-	bbox_locs = np.zeros((5, 4))
-	r = np.random.randint(0, img_rows - window_rows, 5)  # Sample top left position
-	c = np.random.randint(0, img_cols - window_cols, 5)
-	for i in range(0, 5):
-		pats[:, :, i] = img[r[i]:r[i] + window_rows, c[i]:c[i] + window_cols]
-		bbox_locs[i, :] = [r[i], c[i], window_rows, window_cols]  # top-left y,x, height, width
-
-	return pats, bbox_locs
-
-
 def sliding_window_full(img, window_siz, scale, stride):
 	window_rows = window_siz[0]
 	window_cols = window_siz[1]
